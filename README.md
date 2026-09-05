@@ -21,6 +21,12 @@ LAB-RTR-BAD - CIS Cisco IOS Benchmark - Level 1 (subset) v1.0
                         line 57: snmp-server community public RO; line 58: snmp-server community private RW
 ...
 0 pass, 18 fail, 0 n/a, 0 error - score 0.0%
+
+LAB-RTR-BAD - DISA Network Device Management STIG (subset) v1.0
+
+[ FAIL ] NDM-001        Session lock after 10 minutes of inactivity
+...
+1 pass, 9 fail, 0 n/a, 0 error - score 10.0%
 ```
 
 The same command against [`samples/hardened-router.cfg`](samples/hardened-router.cfg) —
@@ -160,6 +166,15 @@ device configurations are backed up and it becomes a compliance gate on configur
 the literal string `EXAMPLE-NOT-A-REAL-SECRET` or a `<PLACEHOLDER>`, and every address comes
 from RFC 5737 or RFC 1918. Real device configurations must never be committed to a
 repository — `.gitignore` blocks `configs-live/` and `*.live.cfg` for exactly that reason.
+
+## Related labs
+
+- [l2-attacks-and-mitigations](https://github.com/ktf40858-stack/l2-attacks-and-mitigations) — what an unhardened switch
+  actually lets an attacker do, which is what these checks exist to prevent.
+- [soc-tier1-detection-lab](https://github.com/ktf40858-stack/soc-tier1-detection-lab) — the detection side: what you write
+  when prevention was not applied in time.
+- [zero-trust-sase-architecture](https://github.com/ktf40858-stack/zero-trust-sase-architecture) — where per-device hardening
+  fits in an identity-based access model.
 
 ## Author
 
