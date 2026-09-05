@@ -1,0 +1,302 @@
+metadata:
+  name: CIS Cisco IOS Benchmark - Level 1 (subset)
+  version: "1.0"
+  source: https://www.cisecurity.org/benchmark/cisco
+  note: >
+    A working subset of the CIS Cisco IOS Benchmark Level 1 controls, chosen because they
+    are checkable from a running-configuration alone. Control numbering follows the CIS
+    benchmark. Controls that require a device query rather than the config (for example
+    verifying the IOS image hash) are out of scope for a config-only tool and are listed
+    in docs/mapping.md instead of being silently passed.
+
+checks:
+  - id: CIS-1.1.1
+    title: Enable aaa new-model
+    severity: high
+    rationale: >
+      Without aaa new-model the device falls back to the legacy line-password model, where
+      authentication cannot be centralised, per-user accountability is lost, and command
+      authorization is unavailable. Every other AAA control depends on this one.
+    remediation: |
+      configure terminal
+       aaa new-model
+    references:
+      - CIS Cisco IOS Benchmark 1.1.1
+      - NIST 800-53 AC-2, IA-2
+    match:
+      type: global_present
+      pattern: '^aaa new-model$'
+
+  - id: CIS-1.1.2
+    title: Enable aaa authentication login
+    severity: high
+    rationale: >
+      Defines which method list authenticates login attempts. Absent it, lines fall back to
+      the line password and there is no per-user identity in the audit trail.
+    remediation: |
+      aaa authentication login default group tacacs+ local
+    references:
+      - CIS Cisco IOS Benchmark 1.1.2
+    match:
+      type: global_present
+      pattern: '^aaa authentication login'
+
+  - id: CIS-1.2.2
+    title: Set transport input ssh on all vty lines
+    severity: high
+    rationale: >
+      Telnet carries credentials and session content in clear text. Any vty line that still
+      accepts telnet undoes SSH on all the others, because an attacker only needs one.
+    remediation: |
+      line vty 0 15
+       transport input ssh
+    references:
+      - CIS Cisco IOS Benchmark 1.2.2
+      - NIST 800-53 SC-8
+    match:
+      type: block_present
+      block_pattern: '^line vty'
+      pattern: '^transport input ssh$'
+
+  - id: CIS-1.2.3
+    title: Disable the auxiliary port
+    severity: medium
+    rationale: >
+      The aux port is almost never used and is regularly forgotten during hardening. If a
+      modem is ever attached to it, it becomes an unauthenticated path into the device.
+    remediation: |
+      line aux 0
+       no exec
+       transport input none
+    references:
+      - CIS Cisco IOS Benchmark 1.2.3
+    match:
+      type: block_present
+      block_pattern: '^line aux'
+      pattern: '^no exec$'
+
+  - id: CIS-1.2.5
+    title: Set an exec-timeout on all vty lines
+    severity: medium
+    rationale: >
+      An idle administrative session left open on an unattended workstation is a fully
+      privileged session available to whoever walks past it.
+    remediation: |
+      line vty 0 15
+       exec-timeout 10 0
+    references:
+      - CIS Cisco IOS Benchmark 1.2.5
+      - NIST 800-53 AC-11
+    match:
+      type: block_present
+      block_pattern: '^line vty'
+      pattern: '^exec-timeout'
+
+  - id: CIS-1.3.1
+    title: Set a login banner
+    severity: low
+    rationale: >
+      A banner asserting that the system is monitored and that unauthorised access is
+      prohibited is what makes prosecution possible in several jurisdictions. It is a legal
+      control implemented in configuration.
+    remediation: |
+      banner login ^C
+      *** Authorised access only. Activity is monitored and recorded. ***
+      ^C
+    references:
+      - CIS Cisco IOS Benchmark 1.3.1
+    match:
+      type: global_present
+      pattern: '^banner (login|motd|exec)'
+
+  - id: CIS-1.4.1
+    title: Use enable secret rather than enable password
+    severity: high
+    rationale: >
+      enable password is stored with the reversible type 7 encoding, which is decoded by
+      any of a dozen public tools in under a second. enable secret stores a hash.
+    remediation: |
+      no enable password
+      enable secret <value>
+    references:
+      - CIS Cisco IOS Benchmark 1.4.1
+      - NIST 800-53 IA-5
+    match:
+      type: global_absent
+      pattern: '^enable password'
+
+  - id: CIS-1.4.2
+    title: Enable service password-encryption
+    severity: medium
+    rationale: >
+      Type 7 encoding is trivially reversible and does not count as protection. It is still
+      worth enabling, because it stops a password being read over a shoulder or scraped out
+      of a configuration pasted into a ticket. It is a mitigation, not a control.
+    remediation: |
+      service password-encryption
+    references:
+      - CIS Cisco IOS Benchmark 1.4.2
+    match:
+      type: global_present
+      pattern: '^service password-encryption$'
+
+  - id: CIS-1.4.3
+    title: Local users must use username secret, not username password
+    severity: high
+    rationale: >
+      username with a plain password is stored as type 0 or reversible type 7. username
+      secret stores a type 9 (scrypt) or type 8 (PBKDF2) hash.
+    remediation: |
+      no username <name> password <value>
+      username <name> privilege 15 secret <value>
+    references:
+      - CIS Cisco IOS Benchmark 1.4.3
+      - NIST 800-53 IA-5(1)
+    match:
+      type: global_absent
+      pattern: '^username \S+ (privilege \d+ )?password'
+
+  - id: CIS-2.1.1
+    title: Disable the BOOTP server
+    severity: low
+    rationale: >
+      Unused service reachable from the network. It has no place on a device that is not a
+      BOOTP server, and it widens the attack surface for nothing.
+    remediation: |
+      no ip bootp server
+    references:
+      - CIS Cisco IOS Benchmark 2.1.1
+    match:
+      type: global_present
+      pattern: '^no ip bootp server$'
+
+  - id: CIS-2.1.4
+    title: Disable the HTTP server
+    severity: high
+    rationale: >
+      The IOS HTTP server has a long CVE history, and when it is enabled it is frequently
+      unauthenticated or backed by the enable password over clear text. If web management
+      is genuinely needed, use ip http secure-server and restrict it with an access class.
+    remediation: |
+      no ip http server
+      no ip http secure-server
+    references:
+      - CIS Cisco IOS Benchmark 2.1.4
+      - CVE-2019-1861, CVE-2023-20198
+    match:
+      type: global_absent
+      pattern: '^ip http server$'
+
+  - id: CIS-2.2.1
+    title: Enable logging to a syslog host
+    severity: high
+    rationale: >
+      Local buffered logging is lost on reload and is under the control of anyone who gains
+      privileged access to the device. Without an off-box copy there is nothing to
+      investigate after an incident.
+    remediation: |
+      logging host <SYSLOG_SERVER>
+      logging trap informational
+    references:
+      - CIS Cisco IOS Benchmark 2.2.1
+      - NIST 800-53 AU-4, AU-9
+    match:
+      type: global_present
+      pattern: '^logging (host )?\d+\.\d+\.\d+\.\d+'
+
+  - id: CIS-2.2.4
+    title: Set logging timestamps with the date and time
+    severity: medium
+    rationale: >
+      A log line without a timestamp cannot be correlated with anything else. Uptime-based
+      timestamps, the IOS default, are unusable across devices.
+    remediation: |
+      service timestamps log datetime msec show-timezone
+    references:
+      - CIS Cisco IOS Benchmark 2.2.4
+      - NIST 800-53 AU-8
+    match:
+      type: global_present
+      pattern: '^service timestamps log datetime'
+
+  - id: CIS-2.3.1
+    title: Do not use default SNMP community strings
+    severity: high
+    rationale: >
+      public and private are the first two strings any scanner tries. A read-only community
+      still exposes the full running-configuration on many platforms; a read-write community
+      is equivalent to administrative access.
+    remediation: |
+      no snmp-server community public
+      no snmp-server community private
+      snmp-server group <GROUP> v3 priv
+    references:
+      - CIS Cisco IOS Benchmark 2.3.1
+      - NIST 800-53 IA-5
+    match:
+      type: global_absent
+      pattern: '^snmp-server community (public|private)'
+
+  - id: CIS-2.3.2
+    title: No SNMP read-write community
+    severity: high
+    rationale: >
+      An SNMP RW community allows the configuration to be written, and on IOS it allows the
+      configuration to be copied off the device over TFTP. It is administrative access
+      protected by a string that travels in clear text under SNMPv2c.
+    remediation: |
+      no snmp-server community <string> RW
+    references:
+      - CIS Cisco IOS Benchmark 2.3.2
+    match:
+      type: global_absent
+      pattern: '^snmp-server community \S+ (RW|rw)'
+
+  - id: CIS-3.1.1
+    title: Disable IP source routing
+    severity: medium
+    rationale: >
+      Source routing lets the sender dictate the path a packet takes, which is used to reach
+      networks that routing policy would otherwise keep unreachable and to bypass filtering.
+    remediation: |
+      no ip source-route
+    references:
+      - CIS Cisco IOS Benchmark 3.1.1
+    match:
+      type: global_present
+      pattern: '^no ip source-route$'
+
+  - id: CIS-3.2.1
+    title: Disable proxy ARP on all interfaces
+    severity: medium
+    rationale: >
+      Proxy ARP lets the router answer ARP for addresses it does not own, which blurs the
+      segmentation boundary and enables ARP-based man-in-the-middle across it.
+    remediation: |
+      interface <name>
+       no ip proxy-arp
+    references:
+      - CIS Cisco IOS Benchmark 3.2.1
+    match:
+      type: block_present
+      block_pattern: '^interface (GigabitEthernet|FastEthernet|TenGigabitEthernet|Ethernet)'
+      pattern: '^no ip proxy-arp$'
+
+  - id: CIS-3.3.2
+    title: Authenticate OSPF adjacencies
+    severity: high
+    rationale: >
+      An unauthenticated OSPF process accepts hellos from anything on the segment. Injecting
+      a route with a better metric redirects traffic through an attacker-controlled host,
+      which is a routing-layer man-in-the-middle that leaves the data plane looking healthy.
+    remediation: |
+      interface <name>
+       ip ospf authentication message-digest
+       ip ospf message-digest-key 1 md5 <key>
+    references:
+      - CIS Cisco IOS Benchmark 3.3.2
+      - NIST 800-53 SC-8
+    match:
+      type: block_present
+      block_pattern: '^interface (GigabitEthernet|FastEthernet|TenGigabitEthernet)'
+      pattern: '^ip ospf (authentication|message-digest-key)'

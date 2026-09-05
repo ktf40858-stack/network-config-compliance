@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+reports/
+*.log
+# Real device configurations must never be committed.
+configs-live/
+*.live.cfg

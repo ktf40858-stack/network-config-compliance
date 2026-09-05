@@ -1,0 +1,191 @@
+metadata:
+  name: DISA Network Device Management STIG (subset)
+  version: "1.0"
+  source: https://public.cyber.mil/stigs/
+  note: >
+    Controls drawn from the DISA Network Device Management (NDM) SRG and the Cisco IOS
+    Router NDM STIG, limited to what a running-configuration can prove.
+
+    On identifiers: the V-IDs in a STIG change between releases, so this file references
+    the stable SRG requirement identifier and the CCI rather than pinning a V-ID that will
+    be wrong at the next quarterly release. Map to the current V-IDs from the STIG
+    Viewer release you are actually being assessed against - see docs/mapping.md.
+
+checks:
+  - id: NDM-001
+    title: Session lock after 10 minutes of inactivity
+    severity: medium
+    rationale: >
+      An unattended privileged session is an unauthenticated privileged session. The DoD
+      requirement is 10 minutes; this check verifies an exec-timeout exists, and the
+      operator must confirm the value is 10 minutes or less.
+    remediation: |
+      line vty 0 15
+       exec-timeout 10 0
+      line con 0
+       exec-timeout 10 0
+    references:
+      - SRG-APP-000190-NDM-000267
+      - CCI-001133
+    match:
+      type: block_present
+      block_pattern: '^line (vty|con)'
+      pattern: '^exec-timeout'
+
+  - id: NDM-002
+    title: DoD Notice and Consent Banner displayed before logon
+    severity: medium
+    rationale: >
+      The Standard Mandatory DoD Notice and Consent Banner must be presented before a user
+      is granted access. Its exact wording is prescribed and cannot be paraphrased; this
+      check only confirms a banner exists, the wording must be verified by hand.
+    remediation: |
+      banner login ^C
+      You are accessing a U.S. Government (USG) Information System (IS) that is
+      provided for USG-authorized use only. [full DoD text required]
+      ^C
+    references:
+      - SRG-APP-000068-NDM-000215
+      - CCI-000048
+    match:
+      type: global_present
+      pattern: '^banner (login|motd)'
+
+  - id: NDM-003
+    title: FIPS-validated cryptography for SSH
+    severity: high
+    rationale: >
+      SSHv1 is broken and is not FIPS-validated. The device must be restricted to SSH
+      version 2, and the key exchange and cipher suites must come from the approved list.
+    remediation: |
+      ip ssh version 2
+      ip ssh server algorithm encryption aes256-ctr aes192-ctr aes128-ctr
+      ip ssh server algorithm mac hmac-sha2-256 hmac-sha2-512
+    references:
+      - SRG-APP-000411-NDM-000330
+      - CCI-000068, CCI-000803
+    match:
+      type: global_present
+      pattern: '^ip ssh version 2$'
+
+  - id: NDM-004
+    title: SSH key modulus of at least 2048 bits
+    severity: high
+    rationale: >
+      A 768 or 1024 bit RSA modulus is below the approved strength. IOS generates 1024 bits
+      by default when the modulus is not specified, which is why this needs to be explicit.
+    remediation: |
+      crypto key generate rsa modulus 2048
+    references:
+      - SRG-APP-000412-NDM-000331
+      - CCI-000803
+    match:
+      type: global_absent
+      pattern: 'modulus (512|768|1024)$'
+
+  - id: NDM-005
+    title: Authentication is centralised on an authentication server
+    severity: high
+    rationale: >
+      Accounts local to a device cannot be centrally disabled when a person leaves, and they
+      are invisible to the account review process. Local accounts are permitted only as the
+      emergency account of last resort.
+    remediation: |
+      aaa new-model
+      aaa authentication login default group tacacs+ local
+      tacacs server <NAME>
+       address ipv4 <SERVER>
+    references:
+      - SRG-APP-000156-NDM-000250
+      - CCI-000765
+    match:
+      type: global_present
+      pattern: '^aaa authentication login default group (tacacs\+|radius)'
+
+  - id: NDM-006
+    title: Command authorization through AAA
+    severity: medium
+    rationale: >
+      Authentication answers who; authorization answers what they may run. Without command
+      authorization, every authenticated administrator is effectively a full administrator.
+    remediation: |
+      aaa authorization commands 15 default group tacacs+ local
+    references:
+      - SRG-APP-000340-NDM-000288
+      - CCI-002235
+    match:
+      type: global_present
+      pattern: '^aaa authorization (commands|exec)'
+
+  - id: NDM-007
+    title: Accounting records are generated for privileged commands
+    severity: medium
+    rationale: >
+      Without command accounting there is no record of what an administrator did, which
+      makes both incident reconstruction and insider-threat investigation impossible.
+    remediation: |
+      aaa accounting commands 15 default start-stop group tacacs+
+      aaa accounting exec default start-stop group tacacs+
+    references:
+      - SRG-APP-000095-NDM-000225
+      - CCI-000130, CCI-000172
+    match:
+      type: global_present
+      pattern: '^aaa accounting (commands|exec)'
+
+  - id: NDM-008
+    title: Management access restricted by an access class
+    severity: high
+    rationale: >
+      Management planes must be reachable only from designated management addresses. An
+      unrestricted vty accepts SSH from any source that can route to the device, which
+      includes any compromised host on the user network.
+    remediation: |
+      ip access-list standard MGMT-ACCESS
+       permit <MGMT_SUBNET> <WILDCARD>
+      line vty 0 15
+       access-class MGMT-ACCESS in
+    references:
+      - SRG-APP-000038-NDM-000213
+      - CCI-001368
+    match:
+      type: block_present
+      block_pattern: '^line vty'
+      pattern: '^access-class \S+ in'
+
+  - id: NDM-009
+    title: NTP is authenticated
+    severity: medium
+    rationale: >
+      Log correlation and certificate validation both depend on the clock. Unauthenticated
+      NTP lets an on-path attacker move the device clock, which desynchronises the audit
+      trail from every other system and can push certificates in or out of validity.
+    remediation: |
+      ntp authenticate
+      ntp authentication-key 1 md5 <key>
+      ntp trusted-key 1
+      ntp server <SERVER> key 1
+    references:
+      - SRG-APP-000373-NDM-000298
+      - CCI-001891
+    match:
+      type: global_present
+      pattern: '^ntp authenticate$'
+
+  - id: NDM-010
+    title: SNMPv3 with privacy, no SNMPv2c community strings
+    severity: high
+    rationale: >
+      SNMPv1 and v2c authenticate with a community string sent in clear text on every
+      request. Capturing one packet gives an attacker the credential. Only v3 with
+      authPriv provides authentication and encryption.
+    remediation: |
+      no snmp-server community <string>
+      snmp-server group <GROUP> v3 priv
+      snmp-server user <USER> <GROUP> v3 auth sha <auth> priv aes 128 <priv>
+    references:
+      - SRG-APP-000412-NDM-000331
+      - CCI-000803
+    match:
+      type: global_absent
+      pattern: '^snmp-server community'
